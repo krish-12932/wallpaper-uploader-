@@ -208,12 +208,7 @@ async def post_wallpaper(wallpaper):
         else:
             hashtags = "#wallpaper #4k #hd #aesthetic"
 
-        post_url = f"{WEBSITE_URL}/wallpaper/{wp_id}"
         caption  = f"<b>{title}</b>\n\n{hashtags}"
-
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📥 Download Wallpaper", url=post_url)]
-        ])
 
         logger.info(f"📤 Downloading image for Telegram: {title}")
         
@@ -242,8 +237,7 @@ async def post_wallpaper(wallpaper):
             chat_id=TELEGRAM_CHANNEL_ID,
             photo=preview_bytes,
             caption=caption,
-            parse_mode="HTML",
-            reply_markup=keyboard
+            parse_mode="HTML"
         )
 
         logger.info("📤 Posting original file as Document to Telegram...")
