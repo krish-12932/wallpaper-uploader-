@@ -212,7 +212,7 @@ async def post_wallpaper(wallpaper):
 
         logger.info(f"📤 Downloading image for Telegram: {title}")
         
-        async with httpx.AsyncClient(follow_redirects=True, timeout=60.0) as client:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=120.0) as client:
             resp = await client.get(file_url)
             if resp.status_code != 200:
                 logger.error(f"Failed to download image from {file_url}.")
