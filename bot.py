@@ -244,11 +244,17 @@ async def post_wallpaper(wallpaper):
         )
 
         logger.info("📤 Posting original file as Document to Telegram...")
-        await scheduler_bot.send_document(
-            chat_id=TELEGRAM_CHANNEL_ID,
-            document=image_bytes,
-            filename=f"{title.replace(' ', '_')}.jpg"
-        )
+        try:
+            await scheduler_bot.send_document(
+                chat_id=TELEGRAM_CHANNEL_ID,
+                document=image_bytes,
+                filename=f"{title.replace(' ', '_')}.jpg",
+                read_timeout=120,
+                write_timeout=120,
+                connect_timeout=120
+            )
+        except Exception as doc_err:
+            logger.error(f"❌ Failed to send document: {doc_err}")
         
         # Mark as posted
         current_time = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
