@@ -21,10 +21,17 @@ def generate_wallpaper_metadata(image_path):
     
     prompt = """
     You are an expert wallpaper curator. Analyze this image and provide metadata.
-    Output ONLY valid JSON format exactly like this, with no markdown formatting or extra text:
+    Output ONLY valid JSON format.
+    
+    CRITICAL INSTRUCTION: For the "category" field, you MUST choose EXACTLY ONE of the following valid categories:
+    "Anime", "Aesthetic", "Nature", "Gaming", "Cars", "Dark", "Minimal", "Abstract", "Space", "City", "Neon", "Technology"
+    
+    If the image does not fit perfectly, pick the closest one from the list above. Do NOT invent a new category.
+    
+    Expected JSON structure:
     {
       "title": "A short, catchy, premium title (max 5 words)",
-      "category": "One single category (e.g., Abstract, Nature, Anime, Aesthetic, Gaming, Minimal, Cars)",
+      "category": "One of the exactly specified valid categories above",
       "description": "A beautiful 1-2 sentence description of the wallpaper.",
       "tags": ["tag1", "tag2", "tag3", "tag4"]
     }
@@ -42,7 +49,7 @@ def generate_wallpaper_metadata(image_path):
     for model_name in models_to_try:
         try:
             logger.info(f"🧠 Attempting AI analysis with model: {model_name}...")
-            model = genai.GenerativeModel(model_name)
+            model = genai.GenerativeModel(model_name, generation_config={"response_mime_type": "application/json"})
             response = model.generate_content([prompt, img])
             
             # Clean up response (sometimes it includes ```json ... ```)
