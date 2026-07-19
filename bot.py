@@ -143,6 +143,27 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
         description = metadata.get("description", "").strip()
         tags = metadata.get("tags", [])
         
+        # 1. VALIDATE CATEGORY
+        ALLOWED_CATEGORIES = ['Anime', 'Aesthetic', 'Nature', 'Gaming', 'Cars', 'Dark', 'Minimal', 'Abstract', 'Space', 'City', 'Neon', 'Technology']
+        if category not in ALLOWED_CATEGORIES:
+            await msg.edit_text(f"❌ Upload Cancelled: AI selected '{category}' which is not a valid category on the website.")
+            if temp_file_path and os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+            return
+
+        # 2. AUTO-RENAME DUPLICATE TITLES
+        await msg.edit_text("🔍 Checking for duplicate titles in database...")
+        title_base = title
+        counter = 1
+        renamed = False
+        while True:
+            resp = supabase.table("photos").select("id").eq("title", title).execute()
+            if not resp.data:
+                break # Title is unique!
+            title = f"{title_base} ({counter})"
+            counter += 1
+            renamed = True
+        
         await msg.edit_text("☁️ Uploading to Supabase Cloud Storage bucket 'image'...")
         
         clean_title = title.lower().replace(" ", "-")
@@ -170,8 +191,10 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         supabase.table("photos").insert(db_payload).execute()
         
+        rename_notice = f"⚠️ *Note:* Title was auto-renamed to avoid duplicates.\n\n" if renamed else ""
         success_text = (
             f"✅ **Wallpaper Successfully Uploaded!**\n\n"
+            f"{rename_notice}"
             f"📌 **Title:** {title}\n"
             f"📂 **Category:** {category}\n"
             f"📝 **Description:** {description}\n"
