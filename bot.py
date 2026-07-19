@@ -214,6 +214,92 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.warning(f"Failed to clean up temp file: {cleanup_error}")
 
 # -------------------------------------------------------------
+# DATABASE AUTO-FIX LOGIC (/fixdb)
+# -------------------------------------------------------------
+async def fix_db(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Command to auto-tag old wallpapers with default title 'Premium Wallpaper'"""
+    user_id = str(update.message.from_user.id)
+    allowed_admins = [uid.strip() for uid in ADMIN_USER_IDS.split(",") if uid.strip()]
+    if allowed_admins and user_id not in allowed_admins:
+        await update.message.reply_text("❌ You are not authorized.")
+        return
+
+    msg = await update.message.reply_text("🔍 Fetching wallpapers to fix from database...")
+    
+    try:
+        resp = supabase.table("photos").select("*").eq("title", "Premium Wallpaper").limit(50).execute()
+        wallpapers = resp.data
+        
+        if not wallpapers:
+            await msg.edit_text("✅ All wallpapers seem to have unique titles! Nothing to fix.")
+            return
+            
+        total = len(wallpapers)
+        await msg.edit_text(f"🛠️ Found {total} wallpapers to fix. Processing now...")
+        
+        fixed_count = 0
+        for wp in wallpapers:
+            wp_id = wp['id']
+            file_url = wp['file_url']
+            old_title = wp['title']
+            
+            temp_file = f"temp_fix_{wp_id}.jpg"
+            try:
+                async with httpx.AsyncClient() as client:
+                    img_resp = await client.get(file_url)
+                    if img_resp.status_code == 200:
+                        with open(temp_file, "wb") as f:
+                            f.write(img_resp.content)
+                            
+                if not os.path.exists(temp_file):
+                    continue
+                    
+                metadata = generate_wallpaper_metadata(temp_file)
+                new_title = metadata.get("title", "Premium Wallpaper").strip()
+                new_category = metadata.get("category", "Aesthetic").strip()
+                new_description = metadata.get("description", "").strip()
+                
+                ALLOWED_CATEGORIES = ['Anime', 'Aesthetic', 'Nature', 'Gaming', 'Cars', 'Dark', 'Minimal', 'Abstract', 'Space', 'City', 'Neon', 'Technology']
+                if new_category not in ALLOWED_CATEGORIES:
+                    new_category = "Aesthetic" 
+                    
+                title_base = new_title
+                counter = 1
+                while True:
+                    dup_resp = supabase.table("photos").select("id").eq("title", new_title).neq("id", wp_id).execute()
+                    if not dup_resp.data:
+                        break
+                    new_title = f"{title_base} ({counter})"
+                    counter += 1
+                    
+                supabase.table("photos").update({
+                    "title": new_title,
+                    "category": new_category,
+                    "description": new_description
+                }).eq("id", wp_id).execute()
+                
+                fixed_count += 1
+                
+                # Notification that title was changed
+                await update.message.reply_text(
+                    f"✅ Fixed 1 Wallpaper:\n"
+                    f"Old Title: `{old_title}`\n"
+                    f"New Title: **{new_title}**\n"
+                    f"Category: {new_category}"
+                )
+            except Exception as loop_err:
+                logger.error(f"Failed to fix wallpaper {wp_id}: {loop_err}")
+            finally:
+                if temp_file and os.path.exists(temp_file):
+                    os.remove(temp_file)
+            
+        await msg.edit_text(f"🎉 Fix DB Complete! Successfully auto-tagged {fixed_count}/{total} wallpapers.")
+            
+    except Exception as e:
+        logger.error(f"Error in fix_db: {e}")
+        await msg.edit_text(f"❌ An error occurred: {e}")
+
+# -------------------------------------------------------------
 # PUBLISHER LOGIC (Supabase -> Telegram Channel)
 # -------------------------------------------------------------
 async def post_wallpaper(wallpaper):
@@ -376,7 +462,7 @@ def main():
     # 4. Start Telegram Message Listener (Uploader) in main thread
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).read_timeout(60).write_timeout(60).connect_timeout(60).build()
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("schedule", get_schedule))
+    application.add_handler(CommandHandler("fixdb", fix_db))
     application.add_handler(MessageHandler(filters.PHOTO | filters.Document.IMAGE, handle_media))
     
     logger.info("🎧 Listening for direct messages to upload wallpapers...")
