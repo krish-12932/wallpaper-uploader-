@@ -227,7 +227,8 @@ async def fix_db(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text("🔍 Fetching wallpapers to fix from database...")
     
     try:
-        resp = supabase.table("photos").select("*").eq("title", "Premium Wallpaper").limit(50).execute()
+        # Use ilike with % wildcard to catch 'Premium Wallpaper', 'Premium Wallpaper (1)', etc.
+        resp = supabase.table("photos").select("*").ilike("title", "Premium Wallpaper%").limit(50).execute()
         wallpapers = resp.data
         
         if not wallpapers:
