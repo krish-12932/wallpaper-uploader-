@@ -463,6 +463,7 @@ def main():
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).read_timeout(60).write_timeout(60).connect_timeout(60).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("fixdb", fix_db))
+    application.add_handler(CommandHandler("schedule", get_schedule))
     application.add_handler(MessageHandler(filters.PHOTO | filters.Document.IMAGE, handle_media))
     
     logger.info("🎧 Listening for direct messages to upload wallpapers...")
