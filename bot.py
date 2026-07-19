@@ -34,6 +34,7 @@ ADMIN_USER_IDS = os.getenv("ADMIN_USER_IDS", "") # Comma-separated admin IDs
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 WEBSITE_URL = os.getenv("WEBSITE_URL", "https://yourwebsite.com")
+TODAYS_SCHEDULE = []
 
 if not all([TELEGRAM_BOT_TOKEN, TELEGRAM_CHANNEL_ID, SUPABASE_URL, SUPABASE_KEY]):
     logger.error("❌ Missing environment variables! Please check your .env file.")
@@ -279,7 +280,16 @@ async def post_single_wallpaper_job():
 def single_job_wrapper():
     asyncio.run(post_single_wallpaper_job())
 
+async def get_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not TODAYS_SCHEDULE:
+        await update.message.reply_text("❌ No schedule generated yet.")
+        return
+    msg = "📅 **Today's Posting Schedule (UTC):**\n\n" + "\n".join([f"• {t}" for t in TODAYS_SCHEDULE])
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
 def schedule_random_times_for_today():
+    global TODAYS_SCHEDULE
+    TODAYS_SCHEDULE = []
     schedule.clear('daily_posts')
     start_minutes = 90
     end_minutes   = 810
@@ -291,6 +301,7 @@ def schedule_random_times_for_today():
         hour   = mins // 60
         minute = mins % 60
         time_str = f"{hour:02d}:{minute:02d}"
+        TODAYS_SCHEDULE.append(time_str)
         schedule.every().day.at(time_str).do(single_job_wrapper).tag('daily_posts')
         logger.info(f"  → {time_str} UTC")
 
@@ -321,6 +332,7 @@ def main():
     # 4. Start Telegram Message Listener (Uploader) in main thread
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).read_timeout(60).write_timeout(60).connect_timeout(60).build()
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("schedule", get_schedule))
     application.add_handler(MessageHandler(filters.PHOTO | filters.Document.IMAGE, handle_media))
     
     logger.info("🎧 Listening for direct messages to upload wallpapers...")
