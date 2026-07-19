@@ -1,6 +1,8 @@
-import os
+import os 
 import io
 import time
+import pytz
+from datetime import datetime
 import logging
 import random
 import asyncio
@@ -284,7 +286,20 @@ async def get_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not TODAYS_SCHEDULE:
         await update.message.reply_text("❌ No schedule generated yet.")
         return
-    msg = "📅 **Today's Posting Schedule (UTC):**\n\n" + "\n".join([f"• {t}" for t in TODAYS_SCHEDULE])
+    
+    # Convert UTC times to IST for display
+    ist_tz = pytz.timezone('Asia/Kolkata')
+    msg = "📅 **Today's Posting Schedule (IST):**\n\n"
+    
+    for time_str in TODAYS_SCHEDULE:
+        # Create a datetime object for today at the scheduled time (UTC)
+        utc_dt = datetime.strptime(f"{datetime.now().strftime('%Y-%m-%d')} {time_str}", "%Y-%m-%d %H:%M")
+        utc_dt = pytz.utc.localize(utc_dt)
+        ist_dt = utc_dt.astimezone(ist_tz)
+        
+        # Format as HH:MM AM/PM
+        msg += f"• {ist_dt.strftime('%I:%M %p')}\n"
+        
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 def schedule_random_times_for_today():
